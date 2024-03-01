@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const { BlobServiceClient } = require('@azure/storage-blob');
-const { TableClient, AzureNamedKeyCredential, TableServiceClient } = require("@azure/data-tables");
+const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 
 const accountKey = "qcaWdF91e3ggHLN5vhJUVZuK+gsvN5/5Dd+jrlssPvEKQ9lkus3bTeQ6B5/h0gsbIzTgJxuE7wWM+ASthguHEg==";
 const STORAGE_ACCOUNT_NAME = 'storagefayflix';
@@ -17,7 +17,7 @@ const blobServiceClient = new BlobServiceClient(
 );
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 
@@ -25,46 +25,62 @@ const scriptName = path.basename(__filename, '.js');
 
 app.get('/videos', async (req, res) => {
     try {
-        const videos = await getVideosData();
+        const videos = await getFilesData(CONTAINER_NAME_VIDEOS);
         res.json(videos);
         await writeToLog('Videos requested successfully.', 'info');
     } catch (error) {
-        await writeToLog(`Error fetching videos: ${error}`, 'error');
-        res.status(500).json({ error: 'Internal Server Error' });
+        handleServerError(error, 'fetching videos', res);
     }
 });
 
-async function getVideosData() {
-    const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME_VIDEOS);
-    const videos = [];
-
-    for await (const blob of containerClient.listBlobsFlat()) {
-        const videoName = path.parse(blob.name).name;
-        const videoPath = `https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER_NAME_VIDEOS}/${blob.name}`;
-        const thumbnailPath = `https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER_NAME_THUMBNAILS}/${videoName}.png`;
-        const gifPath = `https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER_NAME_GIFS}/${videoName}.gif`;
-
-        videos.push({
-            name: videoName,
-            thumbnail: thumbnailPath,
-            gif: gifPath,
-            path: videoPath
-        });
+app.get('/gifs', async (req, res) => {
+    try {
+        const gifs = await getFilesData(CONTAINER_NAME_GIFS);
+        res.json(gifs);
+        await writeToLog('GIFs requested successfully.', 'info');
+    } catch (error) {
+        handleServerError(error, 'fetching GIFs', res);
     }
+});
 
-    return videos;
+app.get('/thumbnails', async (req, res) => {
+    try {
+        const thumbnails = await getFilesData(CONTAINER_NAME_THUMBNAILS);
+        res.json(thumbnails);
+        await writeToLog('Thumbnails requested successfully.', 'info');
+    } catch (error) {
+        handleServerError(error, 'fetching thumbnails', res);
+    }
+});
+
+async function getFilesData(containerName) {
+    try {
+        const containerClient = blobServiceClient.getContainerClient(containerName);
+        const files = [];
+
+        for await (const blob of containerClient.listBlobsFlat()) {
+            const fileName = path.parse(blob.name).name;
+            const filePath = `https://${STORAGE_ACCOUNT_NAME}.blob.core.windows.net/${containerName}/${blob.name}`;
+
+            files.push({
+                name: fileName,
+                path: filePath
+            });
+        }
+
+        return files;
+    } catch (error) {
+        throw new Error(`Error fetching files from container ${containerName}: ${error.message}`);
+    }
 }
 
 app.listen(PORT, async () => {
     try {
         await writeToLog(`Server is running on port ${PORT}`, 'info');
     } catch (error) {
-        await writeToLog("Erro ao iniciar o servidor:", 'error');
-        await writeToLog(error.toString(), 'error');
-        process.exit(1);
+        handleServerError(error, 'starting server');
     }
 });
-
 
 const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
 const year = new Date().getFullYear().toString();
@@ -79,7 +95,7 @@ const tableClient = new TableClient(endpoint, tableName, credential);
         await tableClient.createTable(tableName);
     } catch (error) {
         if (error.statusCode !== 409) {
-            await writeToLog(`Erro ao criar tabela ${tableName}: ${error}`, 'error');
+            handleServerError(error, `creating table ${tableName}`);
         }
     }
 })();
@@ -94,6 +110,13 @@ async function writeToLog(message, logType) {
 
         await tableClient.createEntity(logEntity);
     } catch (error) {
-        writeToLog("Erro ao registrar log:", error);
+        handleServerError(error, 'writing to log');
+    }
+}
+
+function handleServerError(error, action, res) {
+    console.error(`Error ${action}:`, error);
+    if (res) {
+        res.status(500).json({ error: 'Internal Server Error' });
     }
 }
