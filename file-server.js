@@ -5,7 +5,7 @@ const NodeCache = require('node-cache');
 const { BlobServiceClient } = require('@azure/storage-blob');
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 
-const cache = new NodeCache({ stdTTL: 3600 }); // Aumentando o tempo de vida do cache para 10 minutos
+const cache = new NodeCache({ stdTTL: 3600 });
 
 const accountKey = "qcaWdF91e3ggHLN5vhJUVZuK+gsvN5/5Dd+jrlssPvEKQ9lkus3bTeQ6B5/h0gsbIzTgJxuE7wWM+ASthguHEg==";
 const STORAGE_ACCOUNT_NAME = 'storagefayflix';
@@ -30,11 +30,11 @@ const scriptName = path.basename(__filename, '.js');
 async function fetchData(containerName, cacheKey) {
     let data = cache.get(cacheKey);
     if (!data) {
-        console.log(`${containerName} not found in cache. Fetching from storage.`);
+        await writeToLog(`${containerName} not found in cache. Fetching from storage.`, 'info');
         data = await getFilesData(containerName);
         cache.set(cacheKey, data);
     } else {
-        console.log(`${containerName} found in cache.`);
+        await writeToLog(`${containerName} found in cache.`, 'info');
     }
     return data;
 }
