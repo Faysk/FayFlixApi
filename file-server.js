@@ -5,7 +5,7 @@ const NodeCache = require('node-cache');
 const { BlobServiceClient } = require('@azure/storage-blob');
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
 
-const cache = new NodeCache({ stdTTL: 300 });
+const cache = new NodeCache({ stdTTL: 3600 }); // Aumentando o tempo de vida do cache para 10 minutos
 
 const accountKey = "qcaWdF91e3ggHLN5vhJUVZuK+gsvN5/5Dd+jrlssPvEKQ9lkus3bTeQ6B5/h0gsbIzTgJxuE7wWM+ASthguHEg==";
 const STORAGE_ACCOUNT_NAME = 'storagefayflix';
@@ -26,13 +26,23 @@ app.use(cors());
 
 const scriptName = path.basename(__filename, '.js');
 
+// Função para buscar dados do cache ou do armazenamento de blobs
+async function fetchData(containerName, cacheKey) {
+    let data = cache.get(cacheKey);
+    if (!data) {
+        console.log(`${containerName} not found in cache. Fetching from storage.`);
+        data = await getFilesData(containerName);
+        cache.set(cacheKey, data);
+    } else {
+        console.log(`${containerName} found in cache.`);
+    }
+    return data;
+}
+
+// Endpoint para obter vídeos
 app.get('/videos', async (req, res) => {
     try {
-        let videos = cache.get('videos');
-        if (!videos) {
-            videos = await getFilesData(CONTAINER_NAME_VIDEOS);
-            cache.set('videos', videos);
-        }
+        const videos = await fetchData(CONTAINER_NAME_VIDEOS, 'videos');
         res.json(videos);
         await writeToLog('Videos requested successfully.', 'info');
     } catch (error) {
@@ -40,13 +50,10 @@ app.get('/videos', async (req, res) => {
     }
 });
 
+// Endpoint para obter GIFs
 app.get('/gifs', async (req, res) => {
     try {
-        let gifs = cache.get('gifs');
-        if (!gifs) {
-            gifs = await getFilesData(CONTAINER_NAME_GIFS);
-            cache.set('gifs', gifs);
-        }
+        const gifs = await fetchData(CONTAINER_NAME_GIFS, 'gifs');
         res.json(gifs);
         await writeToLog('GIFs requested successfully.', 'info');
     } catch (error) {
@@ -54,13 +61,10 @@ app.get('/gifs', async (req, res) => {
     }
 });
 
+// Endpoint para obter miniaturas
 app.get('/thumbnails', async (req, res) => {
     try {
-        let thumbnails = cache.get('thumbnails');
-        if (!thumbnails) {
-            thumbnails = await getFilesData(CONTAINER_NAME_THUMBNAILS);
-            cache.set('thumbnails', thumbnails);
-        }
+        const thumbnails = await fetchData(CONTAINER_NAME_THUMBNAILS, 'thumbnails');
         res.json(thumbnails);
         await writeToLog('Thumbnails requested successfully.', 'info');
     } catch (error) {
@@ -68,6 +72,27 @@ app.get('/thumbnails', async (req, res) => {
     }
 });
 
+// Endpoint para verificar o status do cache
+app.get('/cache-status', async (req, res) => {
+    try {
+        const cacheStats = cache.getStats();
+        res.json(cacheStats);
+    } catch (error) {
+        handleServerError(error, 'fetching cache status', res);
+    }
+});
+
+// Endpoint para limpar manualmente o cache
+app.delete('/cache-clean', async (req, res) => {
+    try {
+        const success = cache.flushAll();
+        res.json({ success });
+    } catch (error) {
+        handleServerError(error, 'clearing cache', res);
+    }
+});
+
+// Função para buscar dados do armazenamento de blobs
 async function getFilesData(containerName) {
     try {
         const containerClient = blobServiceClient.getContainerClient(containerName);
@@ -89,6 +114,7 @@ async function getFilesData(containerName) {
     }
 }
 
+// Iniciar o servidor
 app.listen(PORT, async () => {
     try {
         await writeToLog(`Server is running on port ${PORT}`, 'info');
@@ -97,6 +123,7 @@ app.listen(PORT, async () => {
     }
 });
 
+// Configuração da tabela Azure
 const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
 const year = new Date().getFullYear().toString();
 const endpoint = "https://storagefayflix.table.core.windows.net/";
@@ -115,6 +142,7 @@ const tableClient = new TableClient(endpoint, tableName, credential);
     }
 })();
 
+// Função para registrar eventos em log
 async function writeToLog(message, logType) {
     try {
         const logEntity = {
@@ -129,6 +157,7 @@ async function writeToLog(message, logType) {
     }
 }
 
+// Função para lidar com erros de servidor
 function handleServerError(error, action, res) {
     console.error(`Error ${action}:`, error);
     if (res) {
