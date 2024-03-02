@@ -1,8 +1,11 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const NodeCache = require('node-cache');
 const { BlobServiceClient } = require('@azure/storage-blob');
 const { TableClient, AzureNamedKeyCredential } = require("@azure/data-tables");
+
+const cache = new NodeCache({ stdTTL: 300 });
 
 const accountKey = "qcaWdF91e3ggHLN5vhJUVZuK+gsvN5/5Dd+jrlssPvEKQ9lkus3bTeQ6B5/h0gsbIzTgJxuE7wWM+ASthguHEg==";
 const STORAGE_ACCOUNT_NAME = 'storagefayflix';
@@ -25,7 +28,11 @@ const scriptName = path.basename(__filename, '.js');
 
 app.get('/videos', async (req, res) => {
     try {
-        const videos = await getFilesData(CONTAINER_NAME_VIDEOS);
+        let videos = cache.get('videos');
+        if (!videos) {
+            videos = await getFilesData(CONTAINER_NAME_VIDEOS);
+            cache.set('videos', videos);
+        }
         res.json(videos);
         await writeToLog('Videos requested successfully.', 'info');
     } catch (error) {
@@ -35,7 +42,11 @@ app.get('/videos', async (req, res) => {
 
 app.get('/gifs', async (req, res) => {
     try {
-        const gifs = await getFilesData(CONTAINER_NAME_GIFS);
+        let gifs = cache.get('gifs');
+        if (!gifs) {
+            gifs = await getFilesData(CONTAINER_NAME_GIFS);
+            cache.set('gifs', gifs);
+        }
         res.json(gifs);
         await writeToLog('GIFs requested successfully.', 'info');
     } catch (error) {
@@ -45,7 +56,11 @@ app.get('/gifs', async (req, res) => {
 
 app.get('/thumbnails', async (req, res) => {
     try {
-        const thumbnails = await getFilesData(CONTAINER_NAME_THUMBNAILS);
+        let thumbnails = cache.get('thumbnails');
+        if (!thumbnails) {
+            thumbnails = await getFilesData(CONTAINER_NAME_THUMBNAILS);
+            cache.set('thumbnails', thumbnails);
+        }
         res.json(thumbnails);
         await writeToLog('Thumbnails requested successfully.', 'info');
     } catch (error) {
