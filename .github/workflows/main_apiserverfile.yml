@@ -14,20 +14,20 @@ jobs:
     runs-on: 'ubuntu-latest'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
     - name: Log in to registry
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         registry: https://index.docker.io/v1/
         username: ${{ secrets.AzureAppService_ContainerUsername_8d0b3405f74f460aba924c18d732a2a9 }}
         password: ${{ secrets.AzureAppService_ContainerPassword_eaca641838db423692adc05c5688ecfa }}
 
     - name: Build and push container image to registry
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v5
       with:
         push: true
         tags: index.docker.io/${{ secrets.AzureAppService_ContainerUsername_8d0b3405f74f460aba924c18d732a2a9 }}/node:${{ github.sha }}
@@ -43,7 +43,7 @@ jobs:
     steps:
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
-      uses: azure/webapps-deploy@v2
+      uses: azure/webapps-deploy@v3
       with:
         app-name: 'apiserverfile'
         slot-name: 'production'
