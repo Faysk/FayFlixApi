@@ -15,7 +15,7 @@ async function getFilesData(containerName, accountName, SAS_TOKEN) {
             const fileName = path.parse(blob.name).name;
             const filePath = `https://${blobServiceClient.accountName}.blob.core.windows.net/${containerName}/${blob.name}`;
 
-            console.log(`Successfully retrieved file: ${filePath}`);
+            // console.log(`Successfully retrieved file: ${filePath}`);
 
             files.push({
                 name: fileName,
@@ -23,7 +23,7 @@ async function getFilesData(containerName, accountName, SAS_TOKEN) {
             });
         }
 
-        console.log(`Successfully retrieved files from container: ${containerName}`);
+        // console.log(`Successfully retrieved files from container: ${containerName}`);
         return files;
     } catch (error) {
         console.error(`Error retrieving files from container ${containerName}:`, error);
