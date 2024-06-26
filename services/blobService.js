@@ -1,4 +1,5 @@
 const path = require('path');
+const slugify = require('slugify');
 const { SAS_TOKEN } = require('../config/config'); 
 const { BlobServiceClient } = require('@azure/storage-blob');
 
@@ -19,7 +20,8 @@ async function getFilesData(containerName, accountName, SAS_TOKEN) {
 
             files.push({
                 name: fileName,
-                path: filePath
+                path: filePath,
+                alias: slugify(fileName.toLowerCase(), '-')
             });
         }
 
